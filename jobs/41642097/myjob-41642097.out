@@ -1,0 +1,13 @@
+c07b002ab8475d1ec218f9d5ed9bb3ad
+/fred/oz149/Tyler/pyenv/trevor/lib/python3.9/site-packages:
+SCRIPT_NAME: job.sh
+Running compile_sources.py
+Generating snap_ids.csv
+Compiling params
+Getting images
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/34/subhalos/1/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f775w&size=100&sizeType=kpc&nPixels=2000&axes=1,2
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/34/subhalos/2/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f775w&size=100&sizeType=kpc&nPixels=2000&axes=2,0
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/34/subhalos/3/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f475w&size=100&sizeType=kpc&nPixels=2000&axes=2,0
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/35/subhalos/1/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f475w&size=100&sizeType=kpc&nPixels=2000&axes=1,0
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/37/subhalos/1/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f475w&size=100&sizeType=kpc&nPixels=2000&axes=0,1
+Requesting http://www.tng-project.org/api/TNG50-1/snapshots/39/subhalos/1/vis.hdf5?partType=stars&partField=stellarBandObsFrame-wfc3_uvis_f475w&size=100&sizeType=kpc&nPixels=2000&axes=0,1
