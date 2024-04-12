@@ -1,41 +1,56 @@
 #!/bin/bash
-#SBATCH --job-name=job
-#SBATCH --partition=trevor
+#SBATCH --job-name=data_simulation
 #SBATCH --output=jobs/running/myjob-%j.out
 #SBATCH --error=jobs/running/myjob-%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=2:30:00
+#SBATCH --time=0:30:00
 #SBATCH --mem=5GB
+#SBATCH --array=0-10
 
-# Export site-packages to python path
-# export LD_LIBRARY_PATH=/fred/oz149/Tyler/pyenv/trevor/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=/fred/oz149/Tyler/pyenv/trevor/lib/python3.9/site-packages:$PYTHONPATH
-echo $ILLUSTRISTNG_API_KEY
+# Variables
+NUMBER_OF_IMAGES=1000
+RESOULTION=0.08
 
-source /fred/oz149/Tyler/pyenv/trevor/bin/activate
+# Actiate the virtual environment
+PYENV_NAME=deeplenstronomy
 
+export PYTHONPATH=/fred/oz149/Tyler/pyenv/$PYENV_NAME/lib/python3.7/site-packages:$PYTHONPATH
+source /fred/oz149/Tyler/pyenv/$PYENV_NAME/bin/activate
 echo $PYTHONPATH
 
 # Create a directory for the job
-mkdir -p jobs/$SLURM_JOB_ID
+mkdir -p jobs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}
+
+# Set the output directory
+OUT_DIR=jobs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}
+
+# If the job is part of an array then create a subdirectory for the array job
+if [ ! -z "$SLURM_ARRAY_TASK_ID" ]; then
+    mkdir -p jobs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}/$SLURM_ARRAY_TASK_ID
+    OUT_DIR=jobs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}/$SLURM_ARRAY_TASK_ID
+fi
 
 # Extract the name of the submission script
 SCRIPT_NAME="${SLURM_JOB_NAME}.sh"
-
 echo "SCRIPT_NAME: $SCRIPT_NAME"
 
 # Copy the submission script to the job directory
-cp jobs/"$SCRIPT_NAME" jobs/$SLURM_JOB_ID/
+cp jobs/"$SCRIPT_NAME" $OUT_DIR
+
+# Copy the config files
+cp -r data/config_files $OUT_DIR
 
 # Run the compile_sources.py script
-echo "Running compile_sources.py"
-PYTHON_SCRIPT='src/SourceImages/compile_sources.py'
+echo "Running data_simulation.py"
+PYTHON_SCRIPT='src/data_simulation.py'
 
-cp "$PYTHON_SCRIPT" jobs/$SLURM_JOB_ID/
-python -u "$PYTHON_SCRIPT"
+echo $((NUMBER_OF_IMAGES/SLURM_ARRAY_TASK_MAX)) images per job
+
+cp "$PYTHON_SCRIPT" $OUT_DIR
+python -u "$PYTHON_SCRIPT" $((NUMBER_OF_IMAGES/SLURM_ARRAY_TASK_MAX)) 0.08 $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID
 
 # move the output files to the job directory
-mv jobs/running/myjob-$SLURM_JOB_ID.out jobs/$SLURM_JOB_ID/
-mv jobs/running/myjob-$SLURM_JOB_ID.err jobs/$SLURM_JOB_ID/
+mv jobs/running/myjob-$SLURM_JOB_ID.out $OUT_DIR
+mv jobs/running/myjob-$SLURM_JOB_ID.err $OUT_DIR
