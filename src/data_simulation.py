@@ -63,16 +63,18 @@ def append_data_to_file(dataset, dataset_path):
                         f['LENS_ID'][-LENS_ID_ARRAY.shape[0]:] = LENS_ID_ARRAY
 
                 f.close()
-
-            # Delete the lock file
-            os.remove(lock_file)
-
-            break  # Exit the loop if successful
         except FileExistsError:
             # If the lock file already exists, wait and try again
             print(f"File is locked, waiting {WAIT_TIME} seconds...")
             time.sleep(WAIT_TIME)
             continue
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            # This block executes whether an exception is thrown or not
+            if os.path.exists(lock_file):
+                os.remove(lock_file)
+            break  # Exit loop after cleaning up
 
 ## VARIABLES
 DATASET_SIZE = int(sys.argv[1])
