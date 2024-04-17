@@ -6,12 +6,21 @@ import pandas as pd
 import numpy as np
 import time
 import h5py
+import fcntl
 
 ## FUNCTIONS
+
 def append_data_to_file(dataset, dataset_path):
     WAIT_TIME = 5
+    lock_file = "jobs/running/file.lock"
+
     while True:
         try:
+            # Try to create the lock file
+            fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+            # If successful, close the file descriptor and proceed
+            os.close(fd)
+
             # Open the HDF5 file in append mode
             with h5py.File(dataset_path, 'a') as f:
                 # Append your data to the HDF5 file
@@ -21,12 +30,13 @@ def append_data_to_file(dataset, dataset_path):
                             data = getattr(dataset, item)
                         except KeyError:
                             print(f"Attribute '{item}' not found in dataset, skipping.")
-                            continue
-                        
+                            continue     
+
                         if isinstance(data, pd.DataFrame):
                             # Add LENS_ID_ARRAY as the index
                             data['LENS_ID'] = LENS_ID_ARRAY
                             data.set_index('LENS_ID', inplace=True)
+                            print(f"Saving {item} to jobs/{JOB_NAME}/{JOB_ARRAY_ID}/{item}.csv")
                             # Check if file exists
                             if os.path.exists(f'data/{item}.csv'):
                                 # Append data to existing file
@@ -51,12 +61,18 @@ def append_data_to_file(dataset, dataset_path):
                         f.create_dataset('LENS_ID', data=LENS_ID_ARRAY)
                     else:
                         f['LENS_ID'][-LENS_ID_ARRAY.shape[0]:] = LENS_ID_ARRAY
-                            
-                break  # Exit the loop if successful
-        except OSError:
-            # File is currently locked by another process
+
+                f.close()
+
+            # Delete the lock file
+            os.remove(lock_file)
+
+            break  # Exit the loop if successful
+        except FileExistsError:
+            # If the lock file already exists, wait and try again
             print(f"File is locked, waiting {WAIT_TIME} seconds...")
             time.sleep(WAIT_TIME)
+            continue
 
 ## VARIABLES
 DATASET_SIZE = int(sys.argv[1])
@@ -82,12 +98,14 @@ print(os.getcwd())
 yamleditor = YamlEditor(CONFIG_FILE_PATH)
 
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SIZE': DATASET_SIZE+2}}})
-yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'OUTDIR': '../data/'}}})
+yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'OUTDIR': f"jobs/{JOB_NAME}/{JOB_ARRAY_ID}"}}})
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SEED': JOB_ARRAY_ID}}})
 yamleditor.update_yaml({'SURVEY': {'PARAMETERS': {'seeing': RESOLUTION}}})
+
 
 ## GENERATE DATA
 DATASET = dl.make_dataset(CONFIG_FILE_PATH, verbose=True)
 
+print(f"SEED: {JOB_ARRAY_ID}")
 ## SAVE DATA TO HDF5 FILE
 append_data_to_file(DATASET, DATASET_PATH)
