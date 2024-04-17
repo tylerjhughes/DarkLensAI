@@ -1,0 +1,2 @@
+/jobfs/local/slurm/job50524401/slurm_script: line 46: 3832830 Killed                  python -u "$PYTHON_SCRIPT"
+slurmstepd: error: Detected 1 oom_kill event in StepId=50524401.batch. Some of the step tasks have been OOM Killed.

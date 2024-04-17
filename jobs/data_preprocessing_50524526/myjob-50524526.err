@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/fred/oz173/Tyler/DarkLensAI/src/data_preprocessing.py", line 19, in <module>
+    ds_perturbed_shape = f['CONFIGURATION_1_images'].shape
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "/fred/oz149/Tyler/pyenv/deeplenstronomy/lib/python3.10/site-packages/h5py/_hl/group.py", line 357, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 190, in h5py.h5o.open
+KeyError: "Unable to open object (object 'CONFIGURATION_1_images' doesn't exist)"
