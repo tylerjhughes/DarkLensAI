@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import h5py
+import sys
 
 def preprocess(data):
     # Mean Normalization
@@ -13,17 +14,19 @@ def preprocess(data):
 
     return data
 
-with h5py.File('data/dataset.h5', 'r') as f:
+MODEL = str(sys.argv[1])
+
+with h5py.File(f'data/dataset_{MODEL}.h5', 'r') as f:
     ds_perturbed_shape = f['CONFIGURATION_1_images'].shape
     ds_unperturbed_shape = f['CONFIGURATION_2_images'].shape
 
-    with h5py.File('data/dataset_preprocessed.h5', 'a') as hf:
+    with h5py.File(f'data/dataset_preprocessed_{MODEL}.h5', 'a') as hf:
         if 'CONFIGURATION_1_images_preprocessed' not in hf:
-            hf.create_dataset('CONFIGURATION_1_images_preprocessed', ds_perturbed_shape, dtype='f')
+            hf.create_dataset('CONFIGURATION_1_images_preprocessed', (ds_perturbed_shape[0], ds_perturbed_shape[2], ds_perturbed_shape[3], ds_perturbed_shape[1]), dtype='f')
         if 'CONFIGURATION_2_images_preprocessed' not in hf:
-            hf.create_dataset('CONFIGURATION_2_images_preprocessed', ds_unperturbed_shape, dtype='f')
+            hf.create_dataset('CONFIGURATION_2_images_preprocessed', (ds_unperturbed_shape[0], ds_unperturbed_shape[2], ds_unperturbed_shape[3], ds_unperturbed_shape[1]), dtype='f')
 
-        batch_size = 1000
+        batch_size = 50
         for i in range(0, ds_perturbed_shape[0], batch_size):
             print(f'Preprocessing perturbed images: {i}/{ds_perturbed_shape[0]}')
             end_index = min(i + batch_size, ds_perturbed_shape[0])

@@ -101,7 +101,7 @@ yamleditor = YamlEditor(CONFIG_FILE_PATH)
 
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SIZE': DATASET_SIZE+2}}})
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'OUTDIR': f"jobs/{JOB_NAME}/{JOB_ARRAY_ID}"}}})
-yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SEED': JOB_ARRAY_ID}}})
+yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SEED': 700 + JOB_ARRAY_ID}}})
 yamleditor.update_yaml({'SURVEY': {'PARAMETERS': {'seeing': RESOLUTION}}})
 
 

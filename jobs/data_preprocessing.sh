@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=08:00:00
-#SBATCH --mem=20GB
+#SBATCH --mem=10GB
 
 # Actiate the virtual environment
 PYENV_NAME=deeplenstronomy
@@ -41,9 +41,10 @@ cp jobs/"$SCRIPT_NAME" $OUT_DIR
 # Run the python script
 echo "Running data_preprocessing.py"
 PYTHON_SCRIPT='src/data_preprocessing.py'
+MODEL='epl'
 
 cp "$PYTHON_SCRIPT" $OUT_DIR
-python -u "$PYTHON_SCRIPT"
+python -u "$PYTHON_SCRIPT" $MODEL
 
 # move the output files to the job directory
 mv jobs/running/myjob-$SLURM_JOB_ID.out $OUT_DIR
