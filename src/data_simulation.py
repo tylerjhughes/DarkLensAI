@@ -1,4 +1,5 @@
 import sys
+JOB_ARRAY_ID = int(sys.argv[4])
 import os
 from utilities import YamlEditor
 import deeplenstronomy.deeplenstronomy as dl
@@ -7,12 +8,22 @@ import numpy as np
 import time
 import h5py
 import fcntl
+import colossus
+
+def getCacheDir(module, create = True):
+    base_dir = os.environ.get('COLOSSUS_CACHE_DIR', '/fred/oz173/Tyler/DarkLensAI/tmp/colossus_cache_' + str(JOB_ARRAY_ID))
+    cache_dir = os.path.join(base_dir, module)
+    if create and not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+colossus.utils.storage.getCacheDir = getCacheDir
 
 ## FUNCTIONS
 
 def append_data_to_file(dataset, dataset_path):
     WAIT_TIME = 5
-    lock_file = "jobs/running/file.lock"
+    lock_file = f"jobs/running/file_{JOB_NAME}.lock"
 
     while True:
         try:
@@ -36,13 +47,13 @@ def append_data_to_file(dataset, dataset_path):
                             # Add LENS_ID_ARRAY as the index
                             data['LENS_ID'] = LENS_ID_ARRAY
                             data.set_index('LENS_ID', inplace=True)
-                            print(f"Saving {item} to jobs/{JOB_NAME}/{JOB_ARRAY_ID}/{item}.csv")
+                            print(f"Saving {item} to jobs/{JOB_NAME}/{JOB_ARRAY_ID}/{item}_{MODEL}.csv")
                             # Check if file exists
-                            if os.path.exists(f'data/{item}.csv'):
+                            if os.path.exists(f'data/{item}_{MODEL}.csv'):
                                 # Append data to existing file
-                                data.to_csv(f'data/{item}.csv', mode='a', header=False)
+                                data.to_csv(f'data/{item}_{MODEL}.csv', mode='a', header=False)
                             else:
-                                data.to_csv(f'data/{item}.csv')
+                                data.to_csv(f'data/{item}_{MODEL}.csv')
                         else: 
                             if item in f:
                                 # append item to existing dataset
@@ -80,7 +91,7 @@ def append_data_to_file(dataset, dataset_path):
 DATASET_SIZE = int(sys.argv[1])
 RESOLUTION = float(sys.argv[2])
 JOB_NAME = sys.argv[3]
-JOB_ARRAY_ID = int(sys.argv[4])
+MODEL = sys.argv[5]
 
 print(DATASET_SIZE)
 
@@ -89,7 +100,7 @@ if JOB_ARRAY_ID != None:
 else:
     CONFIG_FILE_PATH = f'jobs/{JOB_NAME}/config_files/config.yaml'
 
-DATASET_PATH = 'data/dataset.h5'
+DATASET_PATH = f'data/dataset_{MODEL}.h5'
 
 LENS_ID_ARRAY = np.arange(int(DATASET_SIZE/2)) + JOB_ARRAY_ID*int(DATASET_SIZE/2)
 
@@ -101,7 +112,7 @@ yamleditor = YamlEditor(CONFIG_FILE_PATH)
 
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SIZE': DATASET_SIZE+2}}})
 yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'OUTDIR': f"jobs/{JOB_NAME}/{JOB_ARRAY_ID}"}}})
-yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SEED': 700 + JOB_ARRAY_ID}}})
+yamleditor.update_yaml({'DATASET': {'PARAMETERS': {'SEED': JOB_ARRAY_ID}}})
 yamleditor.update_yaml({'SURVEY': {'PARAMETERS': {'seeing': RESOLUTION}}})
 
 

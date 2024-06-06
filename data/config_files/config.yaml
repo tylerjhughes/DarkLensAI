@@ -16,25 +16,6 @@ GEOMETRY:
       OBJECT_1: LENS
       PARAMETERS:
         REDSHIFT: 1
-        SUBHALO: True
-        SUBHALO_MASS: 10**8.5
-    PLANE_2:
-      OBJECT_1: SOURCE
-      PARAMETERS:
-        REDSHIFT: 2
-        CLUMPS: 
-          DISTRIBUTION: 
-            NAME: uniform_int
-            PARAMETERS:
-              minimum: 1
-              maximum: 5
-  CONFIGURATION_2:
-    FRACTION: 0.5
-    NAME: GALAXY_GALAXY_2
-    PLANE_1:
-      OBJECT_1: LENS
-      PARAMETERS:
-        REDSHIFT: 1
     PLANE_2:
       OBJECT_1: SOURCE
       PARAMETERS:
@@ -50,8 +31,8 @@ IMAGE:
     background_noise: 0
     ccd_gain: 0
     exposure_time: 1
-    numPix: 150
-    pixel_scale: 0.02
+    numPix: 175
+    pixel_scale: 0.01
     psf_type: GAUSSIAN
     read_noise: 0
     supersampling_factor: 10
@@ -67,10 +48,5 @@ SURVEY:
     num_exposures: 1
     seeing: 0.06
     sky_brightness: 0
-DISTRIBUTIONS:
-  USERDIST_1:
-    FILENAME: data/config_files/z_thetaE_correlation.txt
-    MODE: sample
-  USERDIST_2: 
-    FILENAME: data/config_files/submass_dist_7-5_11.txt
-    MODE: sample
+
+  

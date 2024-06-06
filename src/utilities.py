@@ -1,5 +1,8 @@
 import yaml
 import collections.abc
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 class YamlEditor(object):
 
@@ -48,3 +51,43 @@ class YamlEditor(object):
 
         with open(self.config_file_path, 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
+
+def plot_training_history(job_dir, log_file_name='trainingLog.log', max_epochs=None, vmax=None):
+    
+        '''
+        This function plots the training history of a model.
+
+        Parameters
+        ----------
+        job_dir : str
+            The directory where the log file is located.
+        log_file_name : str
+            The name of the log file.
+        '''
+    
+        log = pd.read_csv(job_dir + '/' + log_file_name)
+    
+        fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+    
+        ax[0].plot(log['loss'], label='train')
+        ax[0].plot(log['val_loss'], label='val')
+        ax[0].set_title('Loss')
+        ax[0].legend()
+        
+        if np.max(log['val_loss'])/np.mean(log['val_loss']) > 2:
+            ax[0].set_ylim([0, np.percentile(log['val_loss'], 90)])
+    
+        ax[1].plot(log['accuracy'], label='train')
+        ax[1].plot(log['val_accuracy'], label='val')
+        ax[1].set_title('Accuracy')
+        ax[1].legend()
+
+        if max_epochs:
+            ax[0].set_xlim([0, max_epochs])
+            ax[1].set_xlim([0, max_epochs])
+
+        ax[1].set_ylim([0.45, 1])
+    
+        plt.savefig(job_dir + '/training_history.png')
+
+        return fig

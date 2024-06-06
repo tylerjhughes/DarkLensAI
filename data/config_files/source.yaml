@@ -3,18 +3,8 @@ LIGHT_PROFILE_1:
   NAME: SERSIC
   PARAMETERS:
     magnitude: 20
-    center_x: 
-      DISTRIBUTION: 
-        NAME: uniform
-        PARAMETERS:
-          minimum: -0.2
-          maximum: 0.2
-    center_y: 
-      DISTRIBUTION: 
-        NAME: uniform
-        PARAMETERS:
-          minimum: -0.2
-          maximum: 0.2
+    center_x: 0
+    center_y: 0
     R_sersic: 
       DISTRIBUTION:
         NAME: uniform

@@ -1,58 +1,74 @@
 from datetime import datetime
 import tensorflow as tf
 from tensorflow.keras.applications.resnet50 import ResNet50
-from tensorflow.keras.preprocessing import image
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint, EarlyStopping, TensorBoard
+from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint, TensorBoard, Callback
 import numpy as np
 import os
 import sys
-import ast
-import re
 import h5py
 import pandas as pd
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
-def find_best_checkpoint(JobID):
-    log = pd.read_csv(f"/fred/oz149/Tyler/substructure_classifier_v2/ModelEval/TrainingLogs/{JobID}/trainingLog_{PSNR}.log")
-    min_val_loss = log['val_loss'].min()
-    checkpoint_idx = log[log['val_loss']==min_val_loss].index[0] + 1
+def parallel_hdf5_generator(file_paths, batch_size, start_idx, end_idx, limit, is_test=False):
+    current_file = 0
+    current_start_idx = start_idx
+    processed_samples = 0
+    while True:
+        if processed_samples >= limit:
+            break
+        h5_file_path = file_paths[current_file]
+        with h5py.File(h5_file_path, 'r') as f:
+            total_samples = 500000
+            batch_end_idx = min(current_start_idx + batch_size, total_samples, end_idx)
 
-    if checkpoint_idx < 10:
-        checkpoint_idx = f"0{checkpoint_idx}"
+            if current_start_idx < batch_end_idx:
 
-    return checkpoint_idx
+                perturbed_images = f['CONFIGURATION_1_images_preprocessed'][current_start_idx//2:batch_end_idx//2]
+                unperturbed_images = f['CONFIGURATION_2_images_preprocessed'][current_start_idx//2:batch_end_idx//2]
 
-def hdf5_generator(dataset_path, batch_size, idx_array, Test=False):
+                assert len(unperturbed_images) == len(perturbed_images), "Mismatch in dataset lengths"
 
-    # Check that batch size is even
-    if batch_size % 2 != 0:
-        print("Batch size must be even. Exiting.")
-        sys.exit()
-    else:
-        batch_size = batch_size // 2
+                dataset = np.concatenate((perturbed_images, unperturbed_images), axis=0)
+                labels = np.concatenate((np.ones(len(perturbed_images)), np.zeros(len(unperturbed_images))))
 
-    with h5py.File(dataset_path, "r") as f:
+                if is_test:
+                    print(f"Current file: {current_file}, Processed Samples: {processed_samples}, Current start idx: {current_start_idx}, Batch end idx: {batch_end_idx}")
+                    # Check for nan values
+                    if np.isnan(labels).any():
+                        print("Nan values found in labels")
+                        sys.exit()
+                    if np.isnan(dataset).any():
+                        print("Nan values found in dataset")
+                        sys.exit()
 
-        total_samples = sum([len(idx) for idx in idx_array])
+                # shuffle
+                indices = np.arange(len(dataset))
+                np.random.shuffle(indices)
+                dataset = dataset[indices]
+                labels = labels[indices]
 
-        for start_idx in range(0, total_samples//2, batch_size):
+                assert len(dataset) == len(labels), "Mismatch in dataset and label lengths"
 
-            end_idx = min(start_idx + batch_size, total_samples)
-            
-            perturbed_dataset = f['CONFIGURATION_1_images_preprocessed'][idx_array[1][start_idx:end_idx]]
-            unperturbed_dataset = f['CONFIGURATION_2_images_preprocessed'][idx_array[0][start_idx:end_idx]]
-
-            dataset = np.concatenate((unperturbed_dataset, perturbed_dataset), axis=0)
-            labels = np.concatenate((np.zeros(unperturbed_dataset.shape[0]), np.ones(perturbed_dataset.shape[0])), axis=0)
-
-            # Shuffle the dataset
-            shuffle_idx = np.random.permutation(dataset.shape[0])
-
-            dataset = dataset[shuffle_idx]
-            labels = labels[shuffle_idx]
-
-            yield (dataset, labels)
+                yield dataset, labels
+                current_start_idx = batch_end_idx
+                processed_samples += len(dataset)
+            else:
+                if is_test:
+                    print(f"IF FAILED: Current file: {current_file}, Processed Samples: {processed_samples}, Current start idx: {current_start_idx}, Batch end idx: {batch_end_idx}")
+                current_file += 1
+                current_start_idx = 0 
+                f.close() 
+            # close the file
+            f.close()
+    if is_test:
+        print(f"Processed {processed_samples} samples")
+    f.close()
+    current_file = 0
+    current_start_idx = start_idx
 
 
 STARTTIME = datetime.now()
@@ -61,44 +77,47 @@ LR = float(sys.argv[2])
 BATCH_SIZE = int(sys.argv[3])
 OUT_DIR = str(sys.argv[4])
 MODEL = str(sys.argv[5])
+DATASET_SIZE = int(sys.argv[6])
+NUM_SPLITS = 17
 
-# Get test/validation indices
-unperturbed_metadata = pd.read_csv(f'data/CONFIGURATION_2_metadata_{MODEL}.csv')
-perturbed_metadata = pd.read_csv(f'data/CONFIGURATION_1_metadata_{MODEL}.csv')
+# Split the dataset size into training (80%) and validation (20%) sizes
+train_size = int(0.8 * DATASET_SIZE)
+val_size = DATASET_SIZE - train_size
 
-perturbed_training_idx = perturbed_metadata[perturbed_metadata['TRAIN']==1].index.values
-perturbed_validation_idx = perturbed_metadata[perturbed_metadata['TRAIN']==0].index.values
+# Create file paths for the splits
+file_paths = [f"{DATASET_PATH}dataset_sie_part_{i+1}.h5" for i in range(NUM_SPLITS)]
 
-unperturbed_training_idx = unperturbed_metadata[unperturbed_metadata['TRAIN']==1].index.values
-unperturbed_validation_idx = unperturbed_metadata[unperturbed_metadata['TRAIN']==0].index.values
+# Calculate the start and end indices for training and validation data
+train_end_file_idx = train_size // 500000
+train_end_idx_in_last_file = train_size % 500000
 
-training_idx_array = np.array([unperturbed_training_idx, perturbed_training_idx])
-validation_idx_array = np.array([unperturbed_validation_idx, perturbed_validation_idx])
+val_start_file_idx = train_end_file_idx
+val_start_idx_in_first_val_file = train_end_idx_in_last_file
 
-# Run checks
-print("Training idx shape: ", training_idx_array[0].shape, training_idx_array[1].shape)
-print("Validation idx shape: ", validation_idx_array[0].shape, validation_idx_array[1].shape)
+print(f"Train end file idx: {train_end_file_idx}")
+print(f"Train end idx in last file: {train_end_idx_in_last_file}")
+
+print(f"Training data: {train_size} samples, Validation data: {val_size} samples")
+print(f"Training data: {len(file_paths)} files, Validation data: {len(file_paths[val_start_file_idx:])} files")
 
 # Get image shape
-with h5py.File(f"{DATASET_PATH}dataset_preprocessed_{MODEL}.h5", 'r') as f:
+with h5py.File(file_paths[0], 'r') as f:
     try:
-        image_shape = f['CONFIGURATION_1_images_preprocessed'].shape[1::]
+        image_shape = f['CONFIGURATION_1_images_preprocessed'].shape[1:]
     except KeyError:
         print("KeyError: 'CONFIGURATION_1_images_preprocessed' not found in dataset. Ensure you are using the correct dataset.")
-    f.close()
+        sys.exit()
 
 # Initialize the ResNet50 model
-# model = ResNet50(
-#         include_top=True,
-#         weights=None,
-#         input_tensor=None,
-#         input_shape=image_shape,
-#         pooling=None,
-#         classes=2,
-#         classifier_activation='softmax'
-#         )
-
-model = tf.keras.models.load_model(f"models/model_pretrained_sis.keras")
+model = ResNet50(
+    include_top=True,
+    weights=None,
+    input_tensor=None,
+    input_shape=image_shape,
+    pooling=None,
+    classes=2,
+    classifier_activation='softmax'
+)
 
 # Compile the model
 model.compile(optimizer=Adam(learning_rate=LR), loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
@@ -106,20 +125,16 @@ print(model.summary())
 
 # Make it a dataset
 train_dataset = tf.data.Dataset.from_generator(
-    lambda: hdf5_generator(f"{DATASET_PATH}dataset_preprocessed_{MODEL}.h5", BATCH_SIZE, training_idx_array, Test=False),
-    output_types=(tf.float32, tf.float32),
+    lambda: parallel_hdf5_generator(file_paths[:train_end_file_idx+1], BATCH_SIZE, 0, train_size, train_size),
+    output_types=(tf.float32, tf.int32),
     output_shapes=([None, image_shape[0], image_shape[1], image_shape[2]], [None])
-)
+).prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
 validation_dataset = tf.data.Dataset.from_generator(
-    lambda: hdf5_generator(f"{DATASET_PATH}dataset_preprocessed_{MODEL}.h5", BATCH_SIZE, validation_idx_array, Test=True),
-    output_types=(tf.float32, tf.float32),
+    lambda: parallel_hdf5_generator(file_paths[val_start_file_idx:], BATCH_SIZE, val_start_idx_in_first_val_file, train_size + val_size, val_size),
+    output_types=(tf.float32, tf.int32),
     output_shapes=([None, image_shape[0], image_shape[1], image_shape[2]], [None])
-)
-
-# Prefetch the data for performance
-train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-validation_dataset = validation_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+).prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
 # Define callbacks
 csv_logger = CSVLogger(f'{OUT_DIR}/trainingLog.log', append=True)
@@ -129,14 +144,6 @@ model_checkpoint_callback = ModelCheckpoint(
     save_weights_only=False,
     monitor='val_accuracy',
     save_freq='epoch'
-)
-
-# Define EarlyStopping callback
-early_stopping_callback = EarlyStopping(
-    monitor='val_loss',  # Monitoring validation loss
-    patience=10,         # Number of epochs with no improvement after which training will be stopped
-    verbose=1,           # To log when training stops
-    restore_best_weights=True  # This restores model weights from the epoch with the best value of the monitored metric
 )
 
 # Setup TensorBoard callback
@@ -149,9 +156,9 @@ tensorboard_callback = TensorBoard(
 
 model.fit(
     train_dataset,
-    epochs=50,
+    epochs=500,
     validation_data=validation_dataset,
-    callbacks=[csv_logger, model_checkpoint_callback, early_stopping_callback, tensorboard_callback],  # Add the EarlyStopping callback here
+    callbacks=[csv_logger, model_checkpoint_callback, tensorboard_callback],
     verbose=2
 )
 
